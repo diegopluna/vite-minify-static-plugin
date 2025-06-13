@@ -1,7 +1,7 @@
-import { transformSync } from "esbuild"
 import { glob } from "fast-glob"
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs"
 import { dirname, extname, join } from "node:path"
+import { minify } from "terser"
 import { Plugin } from "vite"
 
 export interface MinifyStaticOptions {
@@ -18,13 +18,13 @@ export interface MinifyStaticOptions {
   files?: string[]
 
   /**
-   * ESBuild transform MinifyStaticOptions
+   * Terser minify options 
    */
-  esBuildOptions?: {
-    target?: string
-    minify?: boolean
-    format?: 'iife' | 'cjs' | 'esm'
-    loader?: 'js' | 'ts' | 'jsx' | 'tsx';
+  terserOptions?: {
+    compress?: boolean | object
+    mangle?: boolean | object
+    format?: object
+    sourcemap?: boolean
   }
 
   /**
@@ -48,11 +48,12 @@ export interface MinifyStaticOptions {
 const defaultOptions: Required<Omit<MinifyStaticOptions, 'outputDir'>> & { outputDir?: string } = {
   sourceDir: 'public', // Will be auto-detected
   files: ['**/*.js', '**/*.mjs'],
-  esBuildOptions: {
-    target: 'es2020',
-    minify: true,
-    format: 'iife',
-    loader: 'js'
+  terserOptions: {
+    compress: true,
+    mangle: true,
+    format: {
+      comments: false
+    }
   },
   verbose: false,
   framework: 'auto',
@@ -103,6 +104,26 @@ function shouldProcessBundle(bundleOptions: any, framework: string): boolean {
   }
 }
 
+function safeUnlink(filePath: string): boolean {
+  try {
+    if (!existsSync(filePath)) {
+      return true
+    }
+
+    const stats = statSync(filePath)
+    if (stats.isFile()) {
+      unlinkSync(filePath)
+      return true
+    } else {
+      console.warn(`⚠️  Cannot unlink directory: ${filePath}`)
+      return false
+    }
+  } catch (error) {
+    console.warn(`⚠️  Failed to unlink ${filePath}:`, error)
+    return false
+  }
+}
+
 export function minifyStatic(userOptions: MinifyStaticOptions = {}): Plugin {
   const detectedFramework = userOptions.framework === 'auto' ? detectFramework() : userOptions.framework || 'vanilla'
 
@@ -110,6 +131,10 @@ export function minifyStatic(userOptions: MinifyStaticOptions = {}): Plugin {
     ...defaultOptions,
     sourceDir: userOptions.sourceDir || getDefaultSourceDir(detectedFramework),
     ...userOptions,
+    terserOptions: {
+      ...defaultOptions.terserOptions,
+      ...userOptions.terserOptions
+    },
     framework: detectedFramework
   }
 
@@ -117,7 +142,7 @@ export function minifyStatic(userOptions: MinifyStaticOptions = {}): Plugin {
     name: 'vite-minify-static-plugin',
     apply: 'build',
 
-    writeBundle(bundleOptions) {
+    async writeBundle(bundleOptions) {
       if (!shouldProcessBundle(bundleOptions, options.framework)) {
         if (options.verbose) {
           console.log(`⏭️  Skipping bundle: ${bundleOptions.dir} (${options.framework})`)
@@ -170,29 +195,27 @@ export function minifyStatic(userOptions: MinifyStaticOptions = {}): Plugin {
 
             const code = readFileSync(sourcePath, 'utf-8')
 
-            //Determine loader based on file extensions
-            const ext = extname(file).toLowerCase()
-            let loader = options.esBuildOptions.loader || 'js'
+            // Minify with Terser
+            const result = await minify(code, options.terserOptions)
 
-            if (ext === '.ts') loader = 'ts'
-            else if (ext === '.jsx') loader = 'jsx'
-            else if (ext === '.tsx') loader = 'tsx'
-
-            const result = transformSync(code, {
-              ...options.esBuildOptions,
-              loader
-            })
+            if (!result.code) {
+              console.warn(`⚠️  Terser returned empty result for ${file}`);
+              continue
+            }
 
             //Ensure output directory exists
             const outputDirPath = dirname(outputPath)
 
             if (!existsSync(outputDirPath)) {
-              require('fs').mkDirSync(outputDirPath, { recursive: true })
+              mkdirSync(outputDirPath, { recursive: true })
             }
 
             // Delete original if it exists and write minified version
             if (existsSync(outputPath)) {
-              unlinkSync(outputDirPath)
+              if (!safeUnlink(outputPath)) {
+                console.warn(`⚠️  Could not replace ${outputPath}, skipping`);
+                continue
+              }
             }
 
             writeFileSync(outputPath, result.code)

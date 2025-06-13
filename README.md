@@ -67,10 +67,17 @@ export default defineConfig({
       files: ['**/*.js', '**/*.ts', 'widgets/*.mjs'], // Custom file patterns
       framework: 'react', // Override auto-detection
       verbose: true, // Enable detailed logging
-      esbuildOptions: {
-        target: 'es2018',
-        minify: true,
-        format: 'esm',
+      terserOptions: {
+        compress: {
+          drop_console: true,
+          drop_debugger: true,
+        },
+        mangle: {
+          toplevel: true,
+        },
+        format: {
+          comments: false,
+        },
       },
     }),
   ],
@@ -85,17 +92,18 @@ export default defineConfig({
 | `files` | `string[]` | `['**/*.js', '**/*.mjs']` | Glob patterns for files to minify |
 | `framework` | `string` | `'auto'` | Framework type or auto-detect |
 | `verbose` | `boolean` | `false` | Enable detailed logging |
-| `esbuildOptions` | `object` | See below | ESBuild transform options |
+| `terserOptions` | `object` | See below | Terser minify options |
 | `outputDir` | `string` | `undefined` | Custom output directory |
 
-### Default ESBuild Options
+### Default Terser Options
 
 ```typescript
 {
-  target: 'es2020',
-  minify: true,
-  format: 'iife',
-  loader: 'js', // Auto-detected based on file extension
+  compress: true,
+  mangle: true,
+  format: {
+    comments: false,
+  },
 }
 ```
 
