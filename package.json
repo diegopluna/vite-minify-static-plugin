@@ -1,0 +1,42 @@
+{
+  "name": "vite-minify-static-plugin",
+  "version": "1.0.0",
+  "description": "A universal Vite plugin that minifies static javascript files during build",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --dts",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/diegopluna/vite-plugin-minify-static.git"
+  },
+  "keywords": [
+    "vite",
+    "plugin",
+    "minify",
+    "static"
+  ],
+  "author": "diegopluna",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/diegopluna/vite-plugin-minify-static/issues"
+  },
+  "homepage": "https://github.com/diegopluna/vite-plugin-minify-static#readme",
+  "devDependencies": {
+    "@types/node": "^24.0.1",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.3"
+  },
+  "peerDependencies": {
+    "vite": "^4.0.0 || ^5.0.0 || ^6.0.0"
+  },
+  "dependencies": {
+    "esbuild": "^0.25.5",
+    "fast-glob": "^3.3.3"
+  }
+}
